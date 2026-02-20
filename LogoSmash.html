@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PORR Breakout — Logo Smash</title>
+
+<style>
+  /* ===== Scoped, namespaced styles (no global leakage) ===== */
+  .porr-ls-root {
+    --porr-ls-blue: #143E70;
+    --porr-ls-yellow: #FFED00;
+
+    margin: 0;
+    background: var(--porr-ls-blue);
+    font-family: system-ui, Helvetica, Arial, sans-serif;
+    color: #fff;
+    text-align: center;
+
+    /* Containment */
+    position: relative;           /* overlay covers only this game */
+    display: inline-block;        /* shrink-wrap to canvas width */
+    outline: none;                /* because we set tabindex */
+  }
+
+  .porr-ls-title {
+    margin: 16px 0 8px;
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .porr-ls-canvas {
+    display: block;
+    margin: 0 auto;
+    background: var(--porr-ls-blue);
+    border: 4px solid var(--porr-ls-blue);
+  }
+
+  /* simple HUD controls */
+  #porr-ls-hud {
+    width: 640px;
+    max-width: calc(100vw - 24px);
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  #porr-ls-hud label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #porr-ls-hud input[type="range"] {
+    width: 240px;
+  }
+
+  #porr-ls-speedVal {
+    font-variant-numeric: tabular-nums;
+    min-width: 2.2ch;
+    display: inline-block;
+  }
+
+  #porr-ls-overlay {
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(2px);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    z-index: 10;
+  }
+
+  .porr-ls-btn {
+    margin-top: 1rem;
+    padding: .6rem 1.4rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--porr-ls-yellow);
+    color: var(--porr-ls-blue);
+    cursor: pointer;
+    transition: transform .15s;
+  }
+
+  .porr-ls-btn:hover {
+    transform: scale(1.05);
+  }
+
+  /* ===== Leaderboard (scoped) ===== */
+  .porr-ls-leaderboard{
+    width: 640px;
+    max-width: calc(100vw - 24px);
+    margin: 12px auto 18px;
+    padding: 12px 12px 10px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,237,0,0.18);
+    text-align: left;
+  }
+
+  .porr-ls-lb-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:8px;
+  }
+
+  .porr-ls-lb-title{
+    margin:0;
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: .2px;
+  }
+
+  .porr-ls-lb-btn{
+    padding: .42rem .75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255,237,0,0.45);
+    background: rgba(20,62,112,0.25);
+    color: #fff;
+    cursor: pointer;
+  }
+  .porr-ls-lb-btn:hover{ filter: brightness(1.1); }
+
+  .porr-ls-lb-status{
+    font-size: .9rem;
+    opacity: .85;
+    margin: 0 0 8px;
+  }
+
+  .porr-ls-lb-table{
+    width:100%;
+    border-collapse: collapse;
+    font-size: .95rem;
+  }
+  .porr-ls-lb-table th,
+  .porr-ls-lb-table td{
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    vertical-align: top;
+  }
+  .porr-ls-lb-table th{
+    font-weight: 650;
+    color: rgba(255,237,0,0.92);
+  }
+  .porr-ls-lb-table td{
+    color: rgba(255,255,255,0.95);
+  }
+  .porr-ls-lb-dim{ opacity:.78; }
+</style>
+</head>
+
+<body>
+
+<div class="porr-ls-root" id="porr-ls-root" tabindex="0" aria-label="PORR Logo Smash game">
+  <h1 class="porr-ls-title">PORR Breakout – Logo Smash</h1>
+
+  <div id="porr-ls-hud">
+    <label>
+      Ball speed:
+      <input id="porr-ls-speed" type="range" min="2" max="9" step="0.5" value="7">
+      <span id="porr-ls-speedVal">7</span>
+    </label>
+    <div style="opacity:.85; font-size:.95rem;">Darama cat mai multe caramizi din 10 gloante!</div>
+    <div style="opacity:.85; font-size:.95rem;"> Mouse: aim • Click/Space: shoot </div>
+  </div>
+
+  <canvas id="porr-ls-gameCanvas" class="porr-ls-canvas" width="640" height="480"></canvas>
+
+  <!-- Leaderboard -->
+  <div class="porr-ls-leaderboard" aria-label="Leaderboard">
+    <div class="porr-ls-lb-head">
+      <h2 class="porr-ls-lb-title">Leaderboard (High Score)</h2>
+      <button id="porr-ls-lb-refresh" class="porr-ls-lb-btn" type="button">Refresh</button>
+    </div>
+
+    <div id="porr-ls-lb-status" class="porr-ls-lb-status">Loading...</div>
+
+    <table class="porr-ls-lb-table" role="table">
+      <thead>
+        <tr>
+          <th style="width:56px;">#</th>
+          <th>Player</th>
+          <th style="width:120px;">High score</th>
+          <th style="width:180px;">Updated</th>
+        </tr>
+      </thead>
+      <tbody id="porr-ls-lb-body"></tbody>
+    </table>
+  </div>
+
+  <div id="porr-ls-overlay">
+    <div id="porr-ls-message">Press Start</div>
+    <button id="porr-ls-startBtn" class="porr-ls-btn" type="button">Start</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ===== DOM (scoped) =====
+  const root   = document.getElementById('porr-ls-root');
+  const canvas = document.getElementById('porr-ls-gameCanvas');
+  const ctx    = canvas.getContext('2d');
+
+  // ===== LEADERBOARD CONFIG =====
+  const LB_LIST_TITLE = "PORR Logo Smash Leaderboard"; // SharePoint List title
+  const LB_TAKE_TOP = 10;
+
+  const lbStatusEl = document.getElementById('porr-ls-lb-status');
+  const lbBodyEl   = document.getElementById('porr-ls-lb-body');
+  const lbRefreshBtn = document.getElementById('porr-ls-lb-refresh');
+
+  // ===== SharePoint helpers =====
+  function getWebAbsoluteUrl() {
+    if (window._spPageContextInfo && window._spPageContextInfo.webAbsoluteUrl) {
+      return window._spPageContextInfo.webAbsoluteUrl;
+    }
+    const u = new URL(window.location.href);
+    const path = u.pathname;
+    const p = path.toLowerCase();
+    const cut1 = p.indexOf('/sitepages/');
+    const cut2 = p.indexOf('/pages/');
+    const idx = (cut1 >= 0) ? cut1 : (cut2 >= 0 ? cut2 : path.length);
+    return u.origin + path.slice(0, idx);
+  }
+  const WEB_URL = getWebAbsoluteUrl();
+  function spUrl(p) { return `${WEB_URL}${p}`; }
+
+  async function spGetDigest() {
+    const r = await fetch(spUrl(`/_api/contextinfo`), {
+      method: "POST",
+      headers: { "Accept": "application/json;odata=nometadata" }
+    });
+    if (!r.ok) throw new Error(`contextinfo failed: ${r.status}`);
+    const j = await r.json();
+    return j.FormDigestValue;
+  }
+
+  async function spGetCurrentUser() {
+    const r = await fetch(spUrl(`/_api/web/currentuser?$select=Title,Email,UserPrincipalName`), {
+      headers: { "Accept": "application/json;odata=nometadata" }
+    });
+    if (!r.ok) throw new Error(`currentuser failed: ${r.status}`);
+    return r.json();
+  }
+
+  function safeText(s) { return (s ?? "").toString().trim(); }
+
+  function escapeHtml(str) {
+    return safeText(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, {
+        year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit'
+      });
+    } catch { return iso; }
+  }
+
+  async function loadLeaderboard() {
+    lbStatusEl.textContent = "Loading...";
+    lbBodyEl.innerHTML = "";
+
+    try {
+      const endpoint =
+        `/_api/web/lists/getbytitle('${encodeURIComponent(LB_LIST_TITLE)}')/items` +
+        `?$select=Id,Title,DisplayName,HighScore,Modified` +
+        `&$orderby=HighScore desc,Modified desc` +
+        `&$top=${LB_TAKE_TOP}`;
+
+      const r = await fetch(spUrl(endpoint), {
+        headers: { "Accept": "application/json;odata=nometadata" }
+      });
+
+      if (!r.ok) {
+        lbStatusEl.textContent = `Leaderboard unavailable (HTTP ${r.status}).`;
+        return;
+      }
+
+      const items = await r.json();
+      const rows = (items.value || []);
+
+      if (rows.length === 0) {
+        lbStatusEl.textContent = "No scores yet. Be the first!";
+        return;
+      }
+
+      lbStatusEl.textContent = "";
+
+      rows.forEach((it, i) => {
+        const name = safeText(it.DisplayName) || safeText(it.Title) || "Unknown";
+        const scoreVal = (it.HighScore ?? 0);
+        const updated = fmtDate(it.Modified);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="porr-ls-lb-dim">${i + 1}</td>
+          <td>${escapeHtml(name)}</td>
+          <td><strong>${scoreVal}</strong></td>
+          <td class="porr-ls-lb-dim">${escapeHtml(updated)}</td>
+        `;
+        lbBodyEl.appendChild(tr);
+      });
+
+    } catch (e) {
+      lbStatusEl.textContent = `Leaderboard error: ${e.message}`;
+    }
+  }
+
+  lbRefreshBtn.addEventListener('click', loadLeaderboard);
+
+  async function upsertHighScore(finalScore) {
+    const scoreNum = Number(finalScore);
+    if (!Number.isFinite(scoreNum) || scoreNum < 0) {
+      return { saved: false, reason: "Invalid score." };
+    }
+
+    const user = await spGetCurrentUser();
+    const upn = safeText(user.UserPrincipalName) || safeText(user.Email);
+    const displayName = safeText(user.Title) || upn;
+
+    if (!upn) {
+      return { saved: false, reason: "Cannot resolve user identity." };
+    }
+
+    // OData string escaping for apostrophes only
+    const upnOdata = upn.replaceAll("'", "''");
+    const filterExpr = `Title eq '${upnOdata}'`;
+
+    const findEndpoint =
+      `/_api/web/lists/getbytitle('${encodeURIComponent(LB_LIST_TITLE)}')/items` +
+      `?$select=Id,Title,HighScore` +
+      `&$filter=${encodeURIComponent(filterExpr)}`;
+
+    const findRes = await fetch(spUrl(findEndpoint), {
+      headers: { "Accept": "application/json;odata=nometadata" }
+    });
+
+    if (!findRes.ok) {
+      return { saved: false, reason: `Find failed (HTTP ${findRes.status}).` };
+    }
+
+    const findJson = await findRes.json();
+    const existing = (findJson.value || [])[0];
+
+    const digest = await spGetDigest();
+
+    if (!existing) {
+      // CREATE
+      const createEndpoint = `/_api/web/lists/getbytitle('${encodeURIComponent(LB_LIST_TITLE)}')/items`;
+      const body = {
+        Title: upn,
+        DisplayName: displayName,
+        HighScore: scoreNum
+      };
+
+      const createRes = await fetch(spUrl(createEndpoint), {
+        method: "POST",
+        headers: {
+          "Accept": "application/json;odata=nometadata",
+          "Content-Type": "application/json;odata=nometadata",
+          "X-RequestDigest": digest
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!createRes.ok) {
+        return { saved: false, reason: `Create failed (HTTP ${createRes.status}).` };
+      }
+
+      return { saved: true, reason: "Created." };
+    }
+
+    const prev = Number(existing.HighScore ?? 0);
+    if (scoreNum <= prev) {
+      return { saved: false, reason: `Not saved: your high score is ${prev}.` };
+    }
+
+    // UPDATE (MERGE)
+    const itemId = existing.Id;
+    const updateEndpoint =
+      `/_api/web/lists/getbytitle('${encodeURIComponent(LB_LIST_TITLE)}')/items(${itemId})`;
+
+    const updateBody = {
+      HighScore: scoreNum,
+      DisplayName: displayName
+    };
+
+    const updateRes = await fetch(spUrl(updateEndpoint), {
+      method: "POST",
+      headers: {
+        "Accept": "application/json;odata=nometadata",
+        "Content-Type": "application/json;odata=nometadata",
+        "X-RequestDigest": digest,
+        "IF-MATCH": "*",
+        "X-HTTP-Method": "MERGE"
+      },
+      body: JSON.stringify(updateBody)
+    });
+
+    if (!updateRes.ok) {
+      return { saved: false, reason: `Update failed (HTTP ${updateRes.status}).` };
+    }
+
+    return { saved: true, reason: `Updated from ${prev} to ${scoreNum}.` };
+  }
+
+  // ===== CONSTANTS =====
+  const SHOOTER_BASE_W = 46;
+  const SHOOTER_BASE_H = 14;
+  const BARREL_LEN     = 28;
+  const SHOOTER_SPEED  = 18;
+  const BALL_RADIUS = 5;
+
+  // Visual gutter width (dark area) + wall line
+  const FIELD_MARGIN = 24;
+  const WALL_LINE_W  = 2;
+
+  // Brick logo must stay inside this inner area
+  const WALL_GAP = 8;
+  const INNER_MARGIN = FIELD_MARGIN + WALL_LINE_W + WALL_GAP;
+
+  const MAX_SHOTS = 10;
+  const MAX_AIM_DEG = 170;
+  const MIN_AIM_DEG = 5;
+
+  /*
+    18-row pattern, letters "P O R R".
+    Total columns = 38. 1 = brick, 0 = empty.
+  */
+  const PATTERN = [
+    "00111111011111111011111110111111100",
+    "00111111011111111011111110111111100",
+    "00111111011111111011111110111111100",
+    "00111111011111111011000110110001100",
+    "00110001011000011011000110110001100",
+    "00110001011000011011000110110001100",
+    "00110001011000011011000110110001100",
+    "00110001011000011011000110110001100",
+    "00110001011000011011111110111111100",
+    "00111111011000011011111110111111100",
+    "00111111011000011011111110111111100",
+    "00111111011111111011111000111110000",
+    "00110000011111111011111000111110000",
+    "00110000011111111011101100111011000",
+    "00110000011111111011101100111011000",
+    "00110000011111111011100110111001100",
+    "00110000011111111011100110111001100",
+    "00110000011111111011100010111000100",
+  ];
+  const ROW_COUNT = PATTERN.length;
+  const COL_COUNT = PATTERN[0].length;
+
+  const BRICK_PADDING = 2;
+  const BRICK_HEIGHT  = 8;
+
+  const PLAY_W = canvas.width - 2 * INNER_MARGIN;
+  const BRICK_WIDTH = Math.floor((PLAY_W - (COL_COUNT - 1) * BRICK_PADDING) / COL_COUNT);
+
+  const BRICKS_TOTAL_W = COL_COUNT * BRICK_WIDTH + (COL_COUNT - 1) * BRICK_PADDING;
+
+  const BRICK_OFFSET_X = INNER_MARGIN + (PLAY_W - BRICKS_TOTAL_W) / 2;
+  const BRICK_OFFSET_Y = 40;
+
+  // ===== STATE =====
+  let shooter, balls, bricks, score, shotsLeft, keys, running;
+  let targetBallSpeed = 14;
+
+  // ===== SPEED CONTROL =====
+  const speedEl = document.getElementById('porr-ls-speed');
+  const speedValEl = document.getElementById('porr-ls-speedVal');
+
+  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+  function degToRad(d){ return d * Math.PI / 180; }
+
+  function setBallSpeed(newSpeed) {
+    targetBallSpeed = Number(newSpeed);
+    speedValEl.textContent = String(targetBallSpeed);
+  }
+  speedEl.addEventListener('input', (e) => setBallSpeed(e.target.value));
+
+  function aimFromClientXy(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    const dx = mx - shooter.x;
+    const dy = my - shooter.y;
+
+    let theta = Math.atan2(dy, dx);
+    const minTheta = -Math.PI + degToRad(MIN_AIM_DEG);
+    const maxTheta = -degToRad(MIN_AIM_DEG);
+    theta = clamp(theta, minTheta, maxTheta);
+    shooter.theta = theta;
+  }
+
+  function shooterMuzzle() {
+    return {
+      x: shooter.x + Math.cos(shooter.theta) * BARREL_LEN,
+      y: shooter.y + Math.sin(shooter.theta) * BARREL_LEN,
+      theta: shooter.theta
+    };
+  }
+
+  function shoot() {
+    if (!running) return;
+    if (shotsLeft <= 0) return;
+    shotsLeft--;
+
+    const muzzle = shooterMuzzle();
+    const vx = Math.cos(muzzle.theta) * targetBallSpeed;
+    const vy = Math.sin(muzzle.theta) * targetBallSpeed;
+    balls.push({ x: muzzle.x, y: muzzle.y, dx: vx, dy: vy, r: BALL_RADIUS, alive: true });
+  }
+
+  function resetGame() {
+    shooter = {
+      x: canvas.width/2,
+      y: canvas.height - SHOOTER_BASE_H - 12,
+      theta: -Math.PI/2
+    };
+    balls = [];
+
+    bricks = [];
+    for (let r = 0; r < ROW_COUNT; r++) {
+      for (let c = 0; c < COL_COUNT; c++) {
+        if (PATTERN[r][c] === '1') {
+          bricks.push({
+            x: BRICK_OFFSET_X + c * (BRICK_WIDTH + BRICK_PADDING),
+            y: BRICK_OFFSET_Y + r * (BRICK_HEIGHT + BRICK_PADDING),
+            w: BRICK_WIDTH,
+            h: BRICK_HEIGHT,
+            alive: true
+          });
+        }
+      }
+    }
+    score = 0;
+    shotsLeft = MAX_SHOTS;
+    keys  = {};
+  }
+
+  // ===== INPUT (scoped to wrapper) =====
+  root.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+
+    if (e.code === 'Space' && running) {
+      e.preventDefault();
+      shoot();
+    }
+  });
+
+  root.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) shoot();
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!running) return;
+    aimFromClientXy(e.clientX, e.clientY);
+  });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (!running) return;
+    if (!e.touches || e.touches.length === 0) return;
+    e.preventDefault();
+    aimFromClientXy(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  root.addEventListener('mousedown', () => root.focus());
+  root.addEventListener('touchstart', () => root.focus(), { passive: true });
+
+  // ===== UPDATE =====
+  function update() {
+    if (keys.ArrowLeft)  shooter.x -= SHOOTER_SPEED;
+    if (keys.ArrowRight) shooter.x += SHOOTER_SPEED;
+    shooter.x = clamp(
+      shooter.x,
+      FIELD_MARGIN + SHOOTER_BASE_W/2,
+      canvas.width - FIELD_MARGIN - SHOOTER_BASE_W/2
+    );
+
+    for (const ball of balls) {
+      if (!ball.alive) continue;
+
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+
+      // walls
+      if (ball.x < FIELD_MARGIN + ball.r) { ball.x = FIELD_MARGIN + ball.r; ball.dx *= -1; }
+      if (ball.x > canvas.width - FIELD_MARGIN - ball.r) { ball.x = canvas.width - FIELD_MARGIN - ball.r; ball.dx *= -1; }
+      if (ball.y < ball.r) { ball.y = ball.r; ball.dy *= -1; }
+
+      // brick collisions
+      for (const b of bricks) {
+        if (!b.alive) continue;
+        if (ball.x + ball.r > b.x && ball.x - ball.r < b.x + b.w &&
+            ball.y + ball.r > b.y && ball.y - ball.r < b.y + b.h) {
+
+          b.alive = false;
+          score++;
+
+          const prevX = ball.x - ball.dx;
+          const prevY = ball.y - ball.dy;
+          const wasLeft   = prevX + ball.r <= b.x;
+          const wasRight  = prevX - ball.r >= b.x + b.w;
+          const wasAbove  = prevY + ball.r <= b.y;
+          const wasBelow  = prevY - ball.r >= b.y + b.h;
+
+          if (wasLeft || wasRight) ball.dx *= -1;
+          else if (wasAbove || wasBelow) ball.dy *= -1;
+          else ball.dy *= -1;
+
+          break;
+        }
+      }
+
+      if (ball.y - ball.r > canvas.height) {
+        ball.alive = false;
+      }
+    }
+
+    // cleanup
+    if (balls.length > 40) balls = balls.filter(b => b.alive);
+    else if (balls.some(b => !b.alive)) balls = balls.filter(b => b.alive);
+
+    // win
+    if (bricks.every(b => !b.alive)) {
+      endGame(`You Win!<br>Score: ${score}<br>`);
+    }
+
+    // lose
+    if (shotsLeft <= 0 && balls.length === 0 && bricks.some(b => b.alive)) {
+      endGame(`Out of ammo!<br>Score: ${score}<br>`);
+    }
+  }
+
+  // ===== DRAW =====
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // side gutters
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(0, 0, FIELD_MARGIN, canvas.height);
+    ctx.fillRect(canvas.width - FIELD_MARGIN, 0, FIELD_MARGIN, canvas.height);
+
+    // boundary lines
+    ctx.strokeStyle = 'rgba(255,237,0,0.6)';
+    ctx.lineWidth = WALL_LINE_W;
+    ctx.beginPath();
+    ctx.moveTo(FIELD_MARGIN, 0);
+    ctx.lineTo(FIELD_MARGIN, canvas.height);
+    ctx.moveTo(canvas.width - FIELD_MARGIN, 0);
+    ctx.lineTo(canvas.width - FIELD_MARGIN, canvas.height);
+    ctx.stroke();
+
+    drawTrajectory();
+
+    // shooter base
+    ctx.fillStyle = 'var(--porr-ls-yellow)';
+    ctx.fillRect(shooter.x - SHOOTER_BASE_W/2, shooter.y, SHOOTER_BASE_W, SHOOTER_BASE_H);
+
+    // shooter barrel
+    const muzzle = shooterMuzzle();
+    ctx.strokeStyle = 'rgba(255,237,0,0.95)';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(shooter.x, shooter.y);
+    ctx.lineTo(muzzle.x, muzzle.y);
+    ctx.stroke();
+
+    // balls
+    for (const ball of balls) {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFED00';
+      ctx.fill();
+    }
+
+    // bricks
+    ctx.fillStyle = 'var(--porr-ls-yellow)';
+    for (const b of bricks) {
+      if (b.alive) ctx.fillRect(b.x, b.y, b.w, b.h);
+    }
+
+    // HUD text
+    ctx.fillStyle = 'var(--porr-ls-yellow)';
+    ctx.font = '18px sans-serif';
+    ctx.fillText(`Score: ${score}`, 10, 24);
+    ctx.fillText(`Shots: ${shotsLeft}`, canvas.width - 110, 24);
+  }
+
+  function drawTrajectory() {
+    const muzzle = shooterMuzzle();
+    let x = muzzle.x;
+    let y = muzzle.y;
+    let dx = Math.cos(muzzle.theta) * targetBallSpeed;
+    let dy = Math.sin(muzzle.theta) * targetBallSpeed;
+
+    if (dy > -0.5) return;
+
+    ctx.fillStyle = 'rgba(255,237,0,0.35)';
+
+    const steps = 180;
+    const dotEvery = 6;
+    for (let i = 0; i < steps; i++) {
+      x += dx;
+      y += dy;
+
+      if (x < FIELD_MARGIN + BALL_RADIUS) { x = FIELD_MARGIN + BALL_RADIUS; dx *= -1; }
+      if (x > canvas.width - FIELD_MARGIN - BALL_RADIUS) { x = canvas.width - FIELD_MARGIN - BALL_RADIUS; dx *= -1; }
+      if (y < BALL_RADIUS) { y = BALL_RADIUS; dy *= -1; }
+
+      if (i % dotEvery === 0) {
+        ctx.beginPath();
+        ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (y > canvas.height - 2) break;
+    }
+  }
+
+  function loop() {
+    if (running) {
+      update();
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function showOverlay(html) {
+    document.getElementById('porr-ls-message').innerHTML = html;
+    document.getElementById('porr-ls-overlay').style.display = 'flex';
+  }
+
+  // ===== End game overlay w/ Save prompt =====
+  let lastFinalScore = 0;
+
+  function endGame(endHtml) {
+    running = false;
+    lastFinalScore = score;
+
+    const msg = `
+      ${endHtml}
+      <div style="margin-top:10px; font-size:.95rem; opacity:.9;">
+        Save your score to the Leaderboard?
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; justify-content:center;">
+        <button id="porr-ls-saveBtn" class="porr-ls-btn" style="margin-top:0;" type="button">Save</button>
+        <button id="porr-ls-nosaveBtn" class="porr-ls-btn"
+          style="margin-top:0; background: rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25);"
+          type="button">No thanks</button>
+      </div>
+      <div id="porr-ls-saveStatus" style="margin-top:10px; font-size:.9rem; opacity:.9;"></div>
+      <div style="margin-top:14px; opacity:.9;">Press Start to play again</div>
+    `;
+
+    showOverlay(msg);
+
+    const saveBtn = document.getElementById('porr-ls-saveBtn');
+    const noSaveBtn = document.getElementById('porr-ls-nosaveBtn');
+    const saveStatus = document.getElementById('porr-ls-saveStatus');
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        noSaveBtn.disabled = true;
+        saveStatus.textContent = "Saving...";
+
+        try {
+          const res = await upsertHighScore(lastFinalScore);
+          if (res.saved) {
+            saveStatus.textContent = "Saved ✅";
+            await loadLeaderboard();
+          } else {
+            saveStatus.textContent = res.reason;
+          }
+        } catch (e) {
+          saveStatus.textContent = `Save error: ${e.message}`;
+        } finally {
+          saveBtn.disabled = false;
+          noSaveBtn.disabled = false;
+        }
+      });
+    }
+
+    if (noSaveBtn) {
+      noSaveBtn.addEventListener('click', () => {
+        saveStatus.textContent = "Not saved.";
+      });
+    }
+  }
+
+  document.getElementById('porr-ls-startBtn').addEventListener('click', () => {
+    document.getElementById('porr-ls-overlay').style.display = 'none';
+    resetGame();
+    running = true;
+    root.focus();
+  });
+
+  // init
+  resetGame();
+  setBallSpeed(speedEl.value);
+  running = false;
+
+  // load leaderboard (non-blocking for game)
+  loadLeaderboard();
+
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>

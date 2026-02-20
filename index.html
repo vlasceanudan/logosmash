@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PORR Breakout - Logo Smash</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/game.css">
+  <link rel="stylesheet" href="styles/components.css">
+</head>
+<body>
+  <main class="ls-app" id="ls-app">
+    <header class="ls-header">
+      <h1 class="ls-title">PORR Breakout - Logo Smash</h1>
+      <p class="ls-subtitle">Smash as many logo bricks as possible in 10 shots.</p>
+    </header>
+
+    <section class="ls-hud" aria-label="Game controls">
+      <label class="ls-rangeLabel" for="ls-speed">
+        Ball speed
+        <input id="ls-speed" type="range" min="2" max="9" step="0.5" value="7">
+        <span id="ls-speedVal" class="ls-speedVal">7</span>
+      </label>
+      <p class="ls-instructions">Mouse/touch: aim, Click/Space: shoot, Arrows: move cannon.</p>
+    </section>
+
+    <section class="ls-canvasWrap" aria-label="Logo Smash game area">
+      <canvas id="ls-canvas" width="640" height="480" aria-label="Game canvas"></canvas>
+
+      <div id="ls-overlay" class="ls-overlay" role="dialog" aria-live="polite" aria-modal="true">
+        <div class="ls-overlayCard">
+          <h2 id="ls-overlayTitle">Ready to play?</h2>
+          <p id="ls-overlayText">Press Start and clear the full logo.</p>
+          <button id="ls-startBtn" class="ls-btn" type="button">Start</button>
+          <div id="ls-overlayExtra"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ls-leaderboard" aria-label="Leaderboard">
+      <div class="ls-lbHead">
+        <h2>Leaderboard</h2>
+        <button id="ls-lbRefresh" class="ls-btn ls-btnSmall" type="button">Refresh</button>
+      </div>
+      <p id="ls-lbStatus" class="ls-lbStatus">Loading...</p>
+      <table class="ls-lbTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>High score</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody id="ls-lbBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    window.LOGO_SMASH_ENV = window.LOGO_SMASH_ENV || {
+      SUPABASE_URL: "",
+      SUPABASE_ANON_KEY: ""
+    };
+  </script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
