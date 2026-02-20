@@ -1,0 +1,4 @@
+window.LOGO_SMASH_ENV = {
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: ""
+};

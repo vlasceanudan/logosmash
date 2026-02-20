@@ -41,15 +41,13 @@ Then open:
 1. Create a Supabase project.
 2. In Supabase SQL editor, run `supabase/schema.sql`.
 3. Get your project URL and anon public key.
-4. Edit `index.html` and set:
+4. Edit `config.js` and set:
 
-```html
-<script>
-  window.LOGO_SMASH_ENV = {
-    SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
-    SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_PUBLIC_KEY"
-  };
-</script>
+```js
+window.LOGO_SMASH_ENV = {
+  SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
+  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_PUBLIC_KEY"
+};
 ```
 
 If these values are empty, game still runs but leaderboard calls fail with a clear message.
